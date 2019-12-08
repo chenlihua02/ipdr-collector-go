@@ -1,0 +1,25 @@
+{
+  "collector": {
+    "address": "10.0.0.1",
+    "port": 10765,
+    "vendor": "IPDR",
+    "version": 2,
+    "negotiation": false
+  },
+  "exporter": {
+    "address": "10.0.0.2",
+    "port": 4737,
+    "keep-alive": 20,
+    "connect-timeout": 10,
+    "sessions": [
+      {
+        "id": 1,
+        "name": "session 1"
+      },
+      {
+        "id": 2,
+        "name": "session 2"
+      }
+    ]
+  }
+}
