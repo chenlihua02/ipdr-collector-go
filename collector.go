@@ -18,6 +18,7 @@ import (
 var (
 	sendChan = make(chan []byte, 1)
 	rcvChan  = make(chan []byte, 10)
+	run      bool
 )
 
 func msgSanityCheck(msg []byte) error {
@@ -61,6 +62,8 @@ func msgDecode(msg []byte) (IPDRMsg, error) {
 		rcvdMsg = &KeepAlive{}
 	case ERROR:
 		rcvdMsg = &Error{}
+	case GET_SESSIONS_RESPONSE:
+		rcvdMsg = &GetSessionsResponse{}
 	default:
 		log.Printf("Unsupported msg 0x%x\n", msg[1])
 		return nil, errors.New("Unsupported msg.")
@@ -140,6 +143,9 @@ func RcvMsgHandlerRoutine() {
 func ReceiverRoutine(conn net.Conn) {
 	i := 0
 	for {
+		if !run {
+			break
+		}
 		buf := make([]byte, 65536)
 		cnt, err := conn.Read(buf)
 		if err == io.EOF {
@@ -248,7 +254,7 @@ func main() {
 
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGTERM)
-	run := true
+	run = true
 	for run == true {
 		select {
 		case sig := <-sigchan:

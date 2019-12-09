@@ -39,25 +39,20 @@ func (m *ConnectResponse) Desc() string {
 func (m *ConnectResponse) RespMsg() []IPDRMsg {
 
 	msgs := []IPDRMsg{}
-	sessIds := GetSessionList()
-
-	for _, id := range sessIds {
-
-		var h MsgHdr = MsgHdr{
-			Version: 2,
-			MsgId:   FLOW_START,
-			SessId:  id,
-			MsgFlag: 0,
-			MsgLen:  8,
-		}
-
-		flowStart := &FlowStart{
-			Header: h,
-		}
-
-		msgs = append(msgs, flowStart)
-
+	var h MsgHdr = MsgHdr{
+		Version: 2,
+		MsgId:   GET_SESSIONS,
+		SessId:  0,
+		MsgFlag: 0,
+		MsgLen:  10,
 	}
 
+	getSessions := &GetSessions{
+		Header:    h,
+		RequestId: 0,
+	}
+
+	msgs = append(msgs, getSessions)
 	return msgs
+
 }
