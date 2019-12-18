@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	sendChan = make(chan []byte, 1)
-	rcvChan  = make(chan []byte, 10)
-	run      bool
+	sendChan      = make(chan []byte, 1)
+	rcvChan       = make(chan []byte, 10)
+	run      bool = true
 )
 
 func msgSanityCheck(msg []byte) error {
@@ -119,22 +119,21 @@ func RcvMsgHandlerRoutine() {
 	for {
 		select {
 		case buf := <-rcvChan:
-			buf = append(buf_remain, buf...)
-			//log.Printf("Handle msg %d, len %d\n", i, len(buf))
+			buf_remain = append(buf_remain, buf...)
+			//log.Printf("Handle msg %d, len %d, remain buf len %d\n", i, len(buf), len(buf_remain))
 			i++
-			buf_len_remain = uint32(len(buf))
+			buf_len_remain = uint32(len(buf_remain))
 			for {
-				if len(buf) < 8 {
+				if len(buf_remain) < 8 {
 					break
 				}
-				msg_len = binary.BigEndian.Uint32(buf[4:8])
+				msg_len = binary.BigEndian.Uint32(buf_remain[4:8])
 				if buf_len_remain < msg_len {
 					break
 				}
-				receiveMsg(buf[0:msg_len])
-				buf = buf[msg_len:]
-				buf_remain = buf
-				buf_len_remain = uint32(len(buf))
+				receiveMsg(buf_remain[0:msg_len])
+				buf_remain = buf_remain[msg_len:]
+				buf_len_remain = uint32(len(buf_remain))
 			}
 		}
 	}

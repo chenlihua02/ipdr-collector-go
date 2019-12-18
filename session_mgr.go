@@ -10,8 +10,8 @@ var (
 	msgChan                     = make(chan IPDRMsg)
 	sessions                    = make(map[byte]*Session)
 	sessionMutex   sync.RWMutex = sync.RWMutex{}
-	kaSendInterval uint32
-	kaRecvInterval uint32 = 300 //default 300 seconds
+	kaSendInterval uint32       = 300
+	kaRecvInterval uint32       = 300 //default 300 seconds
 	lastKaSendTime time.Time
 )
 
