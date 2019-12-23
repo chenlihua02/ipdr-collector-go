@@ -70,7 +70,7 @@ func DecodeUTF8String(msg []byte) (UTF8String, uint32) {
 	str := UTF8String{}
 	msgLen := binary.BigEndian.Uint32(msg[:4])
 	str.Length = msgLen
-	str.Str = make([]byte, msgLen+1)
+	str.Str = make([]byte, msgLen)
 	msg = msg[4:]
 	copy(str.Str, msg[:msgLen])
 

@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bufio"
+	"fmt"
 	"log"
+	"os"
 	"sync"
 	"time"
 )
@@ -15,6 +18,22 @@ var (
 	lastKaSendTime time.Time
 )
 
+type Field struct {
+	TypeID    uint32
+	FieldID   uint32
+	FieldName string
+	IsEnabled bool
+}
+
+type Template struct {
+	TemplateID uint16
+	SchemaName string
+	TypeName   string
+	Fields     []Field
+	fileName   string
+	output     *os.File
+}
+
 type Session struct {
 	Id                  byte
 	Type                byte
@@ -25,6 +44,8 @@ type Session struct {
 	LastSeq             uint64
 	LastAckedTime       time.Time
 	Started             bool
+	DocID               []byte
+	Templates           []Template
 }
 
 func (s *Session) sendAck() {
@@ -85,7 +106,71 @@ func AddSession(m *TemplateData) {
 		ConfigId: m.ConfigID,
 	}
 
+	for _, tb := range m.Templates {
+		t := Template{}
+		t.TemplateID = tb.TemplateID
+		t.SchemaName = string(tb.SchemaName.Str)
+		t.TypeName = string(tb.TypeName.Str)
+		t.output = nil
+		t.fileName = ""
+		for _, fd := range tb.Fields {
+			f := Field{}
+			f.TypeID = fd.TypeID
+			f.FieldID = fd.FieldID
+			f.FieldName = string(fd.FieldName.Str)
+			if fd.IsEnabled == 0 {
+				f.IsEnabled = false
+			} else {
+				f.IsEnabled = true
+			}
+			t.Fields = append(t.Fields, f)
+		}
+		s.Templates = append(s.Templates, t)
+	}
+
+	//log.Printf("Add session % +v\n", s)
+
 	sessions[m.Header.SessId] = s
+}
+
+func createFileTemplate(t *Template, s *Session) {
+	fileName := fmt.Sprintf("%d_%d_%s_%s.csv", s.Id, t.TemplateID, t.TypeName,
+		time.Now().Format("2006-01-02-15-04-05"))
+	file, err := os.Create(fileName)
+	if err != nil {
+		log.Printf("Err: %s\n", err)
+		return
+	}
+	t.fileName = fileName
+	t.output = file
+	bufferedWriter := bufio.NewWriter(file)
+	first := true
+	for _, f := range t.Fields {
+		if first {
+			_, err = bufferedWriter.WriteString(f.FieldName)
+			first = false
+		} else {
+			_, err = bufferedWriter.WriteString(",")
+			_, err = bufferedWriter.WriteString(f.FieldName)
+		}
+	}
+	_, err = bufferedWriter.WriteString("\n")
+	bufferedWriter.Flush()
+	bufferedWriter.Reset(bufferedWriter)
+
+}
+
+func createFiles(s *Session) {
+	for _, t := range s.Templates {
+		createFileTemplate(&t, s)
+	}
+}
+
+func closeFiles(s *Session) {
+	for _, t := range s.Templates {
+		t.output.Close()
+		t.fileName = ""
+	}
 }
 
 func UpdateSession(m *SessionStart) {
@@ -102,6 +187,9 @@ func UpdateSession(m *SessionStart) {
 		s.LastSeq = 0
 		s.LastAckedTime = time.Now()
 		s.Started = true
+		s.DocID = make([]byte, 16)
+		copy(s.DocID, m.DocumentID)
+		createFiles(s)
 	} else {
 		log.Printf("Session %d not exist internal when handle start session.\n", sessId)
 
@@ -116,6 +204,7 @@ func RemoveSession(m *SessionStop) {
 
 	if s, ok := sessions[sessId]; ok {
 		//Didn't remove from map, just mark a flag
+		closeFiles(s)
 		s.Started = false
 	}
 }

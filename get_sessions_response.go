@@ -44,13 +44,13 @@ func (m *GetSessionsResponse) Decode(msg []byte) error {
 
 		length := binary.BigEndian.Uint32(msg[:4])
 		s.SessName.Length = length
-		s.SessName.Str = make([]byte, length+1)
+		s.SessName.Str = make([]byte, length)
 		copy(s.SessName.Str, msg[4:length+4])
 		msg = msg[length+4:]
 
 		length = binary.BigEndian.Uint32(msg[:4])
 		s.SessDesc.Length = length
-		s.SessDesc.Str = make([]byte, length+1)
+		s.SessDesc.Str = make([]byte, length)
 		copy(s.SessDesc.Str, msg[4:length+4])
 		msg = msg[length+4:]
 

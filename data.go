@@ -31,7 +31,7 @@ func (m *Data) Decode(msg []byte) error {
 	m.Flags = msg[12]
 	m.SequenceNum = binary.BigEndian.Uint64(msg[13:21])
 	//data_len = msg_len - header_len - 17
-	m.Record = make([]byte, m.Header.MsgLen-8-17+1)
+	m.Record = make([]byte, m.Header.MsgLen-8-17)
 
 	copy(m.Record, msg[21:])
 
