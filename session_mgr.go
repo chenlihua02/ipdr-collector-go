@@ -29,9 +29,9 @@ type Template struct {
 	TemplateID uint16
 	SchemaName string
 	TypeName   string
-	Fields     []Field
-	fileName   string
-	output     *os.File
+	Fields     []*Field
+	FileName   string
+	Output     *os.File
 }
 
 type Session struct {
@@ -45,7 +45,46 @@ type Session struct {
 	LastAckedTime       time.Time
 	Started             bool
 	DocID               []byte
-	Templates           []Template
+	Templates           []*Template
+}
+
+func (t *Template) appendRecord(r []byte) error {
+	var length uint32
+	var typeId TypeID
+	var err error
+	first := true
+	r = r[4:]
+	bufferedWriter := bufio.NewWriter(t.Output)
+	for _, f := range t.Fields {
+		typeId = TypeID(f.TypeID)
+		length = XdrTypeLength(typeId, r)
+		str, _ := XdrDecode(typeId, r[:length])
+		if first {
+			_, err = bufferedWriter.WriteString(str)
+			first = false
+		} else {
+			_, err = bufferedWriter.WriteString("," + str)
+		}
+		if err != nil {
+			log.Printf("appendRecord err: %s\n", err)
+			break
+		}
+		//log.Printf("F.ID %x F.FieldID %d, F.Name %s, length %d, r: % x, str %s\n",
+		//	f.TypeID, f.FieldID, f.FieldName, length, r[:length], str)
+		//log.Printf("remain len %d, len %d\n", len(r), length)
+		if uint32(len(r)) > length {
+			r = r[length:]
+		} else {
+			break
+		}
+	}
+	_, err = bufferedWriter.WriteString("\n")
+	if err != nil {
+		log.Printf("appendRecord err: %s\n", err)
+	}
+	bufferedWriter.Flush()
+	bufferedWriter.Reset(bufferedWriter)
+	return nil
 }
 
 func (s *Session) sendAck() {
@@ -107,14 +146,15 @@ func AddSession(m *TemplateData) {
 	}
 
 	for _, tb := range m.Templates {
-		t := Template{}
+		t := &Template{}
 		t.TemplateID = tb.TemplateID
 		t.SchemaName = string(tb.SchemaName.Str)
 		t.TypeName = string(tb.TypeName.Str)
-		t.output = nil
-		t.fileName = ""
+		t.Output = nil
+		t.FileName = ""
+		log.Printf("set sess %d template %d name to null", sessId, t.TemplateID)
 		for _, fd := range tb.Fields {
-			f := Field{}
+			f := &Field{}
 			f.TypeID = fd.TypeID
 			f.FieldID = fd.FieldID
 			f.FieldName = string(fd.FieldName.Str)
@@ -134,15 +174,16 @@ func AddSession(m *TemplateData) {
 }
 
 func createFileTemplate(t *Template, s *Session) {
-	fileName := fmt.Sprintf("%d_%d_%s_%s.csv", s.Id, t.TemplateID, t.TypeName,
-		time.Now().Format("2006-01-02-15-04-05"))
+	fileName := fmt.Sprintf("IPDR_RECORD_%s_S%d_T%d_%s.csv",
+		time.Now().Format("2006-01-02-15-04-05"), s.Id, t.TemplateID, t.TypeName)
 	file, err := os.Create(fileName)
 	if err != nil {
 		log.Printf("Err: %s\n", err)
 		return
 	}
-	t.fileName = fileName
-	t.output = file
+	t.FileName = fileName
+	log.Printf("set sess %d template %d name to %s", s.Id, t.TemplateID, fileName)
+	t.Output = file
 	bufferedWriter := bufio.NewWriter(file)
 	first := true
 	for _, f := range t.Fields {
@@ -150,8 +191,7 @@ func createFileTemplate(t *Template, s *Session) {
 			_, err = bufferedWriter.WriteString(f.FieldName)
 			first = false
 		} else {
-			_, err = bufferedWriter.WriteString(",")
-			_, err = bufferedWriter.WriteString(f.FieldName)
+			_, err = bufferedWriter.WriteString("," + f.FieldName)
 		}
 	}
 	_, err = bufferedWriter.WriteString("\n")
@@ -162,18 +202,18 @@ func createFileTemplate(t *Template, s *Session) {
 
 func createFiles(s *Session) {
 	for _, t := range s.Templates {
-		createFileTemplate(&t, s)
+		createFileTemplate(t, s)
 	}
 }
 
 func closeFiles(s *Session) {
 	for _, t := range s.Templates {
-		t.output.Close()
-		t.fileName = ""
+		t.Output.Close()
+		t.FileName = ""
 	}
 }
 
-func UpdateSession(m *SessionStart) {
+func StartSession(m *SessionStart) {
 	sessId := m.Header.SessId
 
 	sessionMutex.Lock()
@@ -193,6 +233,22 @@ func UpdateSession(m *SessionStart) {
 	} else {
 		log.Printf("Session %d not exist internal when handle start session.\n", sessId)
 
+	}
+}
+
+func UpdateSession(d *Data) {
+	sessId := d.Header.SessId
+	if s, ok := sessions[sessId]; ok {
+		sessions[sessId].LastSeq = d.SequenceNum
+		sessions[sessId].ConfigId = d.ConfigID
+		sessions[sessId].UnackedNum++
+		sessions[sessId].CheckSequenceInterval()
+		for _, t := range s.Templates {
+			if t.TemplateID == d.TemplateID {
+				t.appendRecord(d.Record)
+				break
+			}
+		}
 	}
 }
 
@@ -234,15 +290,11 @@ func handleMsg(msg IPDRMsg) {
 
 	switch t := msg.(type) {
 	case *Data:
-		id := t.Header.SessId
-		sessions[id].LastSeq = t.SequenceNum
-		sessions[id].ConfigId = t.ConfigID
-		sessions[id].UnackedNum++
-		sessions[id].CheckSequenceInterval()
+		UpdateSession(t)
 	case *TemplateData:
 		AddSession(t)
 	case *SessionStart:
-		UpdateSession(t)
+		StartSession(t)
 	case *SessionStop:
 		RemoveSession(t)
 	case *KeepAlive:
