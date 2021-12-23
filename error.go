@@ -49,7 +49,7 @@ func (m *Error) Decode(msg []byte) error {
 	m.TimeStamp = binary.BigEndian.Uint32(msg[8:12])
 	m.ErrorCode = binary.BigEndian.Uint16(msg[12:14])
 	m.Description.Length = binary.BigEndian.Uint32(msg[14:18])
-	m.Description.Str = make([]byte, m.Description.Length+1)
+	m.Description.Str = make([]byte, m.Description.Length)
 	copy(m.Description.Str, msg[18:])
 
 	return err

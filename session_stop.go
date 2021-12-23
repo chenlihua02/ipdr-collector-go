@@ -25,7 +25,7 @@ func (m *SessionStop) Decode(msg []byte) error {
 	err := binary.Read(bytesBuffer, endian, &m.Header)
 	m.ReasonCode = binary.BigEndian.Uint16(msg[8:10])
 	m.ReasonInfo.Length = binary.BigEndian.Uint32(msg[10:14])
-	m.ReasonInfo.Str = make([]byte, m.ReasonInfo.Length+1)
+	m.ReasonInfo.Str = make([]byte, m.ReasonInfo.Length)
 	copy(m.ReasonInfo.Str, msg[14:])
 
 	return err

@@ -26,7 +26,7 @@ func (m *ConnectResponse) Decode(msg []byte) error {
 	m.Capabilities = binary.BigEndian.Uint32(msg[8:12])
 	m.KaInterval = binary.BigEndian.Uint32(msg[12:16])
 	m.VendorId.Length = binary.BigEndian.Uint32(msg[16:20])
-	m.VendorId.Str = make([]byte, m.VendorId.Length+1)
+	m.VendorId.Str = make([]byte, m.VendorId.Length)
 	copy(m.VendorId.Str, msg[20:])
 
 	return err

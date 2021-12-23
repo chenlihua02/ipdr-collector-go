@@ -65,6 +65,18 @@ func (s *UTF8String) Encode() []byte {
 	return b
 }
 
+func DecodeUTF8String(msg []byte) (UTF8String, uint32) {
+
+	str := UTF8String{}
+	msgLen := binary.BigEndian.Uint32(msg[:4])
+	str.Length = msgLen
+	str.Str = make([]byte, msgLen)
+	msg = msg[4:]
+	copy(str.Str, msg[:msgLen])
+
+	return str, 4 + msgLen
+}
+
 type MsgHdr struct {
 	Version byte
 	MsgId   MessageID
